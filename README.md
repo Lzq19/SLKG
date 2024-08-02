@@ -10,7 +10,7 @@ $ conda install --yes --file requirements.txt
 ```bash
 $ python run.py
 ```
-## Gradio Example
+## Gradio Demo
 ```bash
 $ python show.py
 ```
