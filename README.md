@@ -2,7 +2,7 @@
 The Automated Construction Method of the Chinese Sign Language Knowledge Graph
 ## Installation
 ```bash
-$ git clone https://github.com/yourusername/SLKG.git
+$ git clone https://github.com/Lzq19/SLKG.git
 $ cd SLKG
 $ conda install --yes --file requirements.txt
 ```
