@@ -2,11 +2,13 @@ from transformers import AutoTokenizer, AutoModel, AutoConfig
 import torch
 import os
 import json
-from openpyxl import load_workbook
-from FlagEmbedding import FlagReranker
-from FlagEmbedding import BGEM3FlagModel
+from tqdm import tqdm
+from enity_alignment import enity_alignment_e
+import copy
 import pandas as pd
-from tqdm import tqdm  
+from openpyxl import load_workbook, Workbook
+from FlagEmbedding import BGEM3FlagModel
+
 
 
 def model_act():
@@ -29,44 +31,6 @@ def model_act():
     return model,tokenizer
 
 
-def enity_alignment_r(bodypart):
-    df = pd.read_csv('./data/bodyparts.csv', encoding='utf-8')
-
-    bodyparts_dict = df.iloc[:, -1].tolist()
-    score_list = []
-    for bodypart_ in bodyparts_dict:
-        score = reranker.compute_score([bodypart,bodypart_])
-        score_list.append(score)
-
-    indexs = sorted(range(len(score_list)), key=lambda i: score_list[i], reverse=True)[:2]
-    top2 = [bodyparts_dict[i] for i in indexs]
-    if len(top2[0]) == len(top2[1]):
-        return top2[0]
-    else:
-        for top in top2:
-            if len(bodypart) < len(top):
-                return top
-
-def enity_alignment_e(bodypart):
-    model = BGEM3FlagModel('./thirdparty/bge/bge-m3', use_fp16=True)
-    df = pd.read_csv('./data/bodyparts.csv', encoding='utf-8')
-
-    bodyparts_dict = df.iloc[:, -1].tolist()
-    similarity_dict = []
-    embeddings_1 = model.encode(bodypart, return_dense=True, return_sparse=True, return_colbert_vecs=True)
-    for bodypart_ in bodyparts_dict:
-        embeddings_2 = model.encode(bodypart_, return_dense=True, return_sparse=True, return_colbert_vecs=True)
-        similarity = model.colbert_score(embeddings_1['colbert_vecs'], embeddings_2['colbert_vecs'])
-        similarity_dict.append(similarity)
-
-    max_similarity = max(similarity_dict)
-    max_index = similarity_dict.index(max_similarity)
-    return bodyparts_dict[max_index]
-
-def process_row(row):
-    return [item.upper() if index==1 else item for index, item in enumerate(row)]
-
-
 def sp(label):
     # 使用字典来根据第一个字符串元素分组  
     label_groups = {}
@@ -84,43 +48,52 @@ def calculate_f1(precision, recall):
         f1 = 2 * (precision * recall) / (precision + recall)  
         return f1  
 
+def bgem3(list,lists):
+    model = BGEM3FlagModel('./thirdparty/bge/bge-m3', use_fp16=True) 
 
-def output_to_excel(filename,out_file_name):
-    ##################将大模型输出的知识图谱文件写到excel中#################
-    # 假设您的文本数据存储在名为data.txt的文件中
+    embeddings1 = model.encode(list)
+    for i in lists:
+        embeddings2 = model.encode(i)
+        pc = 0
+        for vec1, vec2 in zip(embeddings1['dense_vecs'], embeddings2['dense_vecs']):
+            sim = vec1 @ vec2.T
+            if sim > 0.9:
+                pc+=1
+                continue
+        if pc==4:
+            return 0
+        else:
+            continue
+    return 1
 
-    # 读取文件并解析每行数据
-    data = []
-    with open(filename, 'r', encoding='utf-8') as file:
-        for line in file:
-            data_p = []
-            line = line.replace('\n', '')
-            parts = line.strip().split(';')
-            parts = [element for element in parts if element != '']
+def process_excel(file_path):  
+    workbook = load_workbook(file_path)  
+    sheet = workbook.active  
+    all_rows = []  
+    # 读取所有列
+    for row in sheet.iter_rows(values_only=True):  
+        # 读取所有列并删除空格  
+        row_data = [str(cell).strip() for cell in row]   
+        all_rows.append(row_data)  
+      
+    return all_rows
 
-            for part in parts:
-                units = part.strip().split(',')
-                if len(units) == 4:
-                    data_p.append(units)
-                else:
-                    print(units)
-                    data_p = []
-                    break
-            else:
-                for d in data_p:
-                    data.append(d)
+def count_missing_elements(data_dict):  
+    label_sublists = data_dict['./data/label.xlsx']
+    sign_sublists = data_dict['./data/SignKG-e.xlsx']
 
-                        # 转换为pandas DataFrame
-    df = pd.DataFrame(data, columns=['词', '身体部位', '动作', '时间序号'])
-
-    # 将DataFrame写入Excel文件，如果需要，可以更改文件名
-    df.to_excel(out_file_name, index=False)
-
+    worse = 0
+    for sign_sublist in tqdm(sign_sublists):  
+        worsec = bgem3(sign_sublist,label_sublists)
+        worse += worsec
+ 
+    return worse 
 
 if __name__ == "__main__":
     
     file_path = './data/P-test.json'
-    out_path = './data/P-test_output.txt'
+    wb2 = Workbook() 
+    ws2 = wb2.active
 
     data = []
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -128,108 +101,131 @@ if __name__ == "__main__":
             line = line.strip()
             json_data = json.loads(line)
             content = json_data.get('content','')
+            summary = json_data.get('summary','')
+            p = summary.replace('，', ',').replace('；', ';')
+            if p[-1] == ';':
+                p = p[:-1]
+            lines2 = [line2.strip() for line2 in p.split(';')]
+            data2 = [line2.split(',') for line2 in lines2]
+            for d2 in data2:
+                ws2.append(d2)
             data.append(content)
+            wb2.save("./data/label.xlsx")
 
-    with open(out_path, 'w', encoding='utf-8') as o:
-        model,tokenizer = model_act()
-        for query in data:
-            res = model.chat(tokenizer, query, history=[])
-            o.write(res[0]+'\n')
+    wb = Workbook() 
+    ws = wb.active  
+
+    wb3 = Workbook() 
+    ws3 = wb3.active
+
+    model,tokenizer = model_act()
+    for query in tqdm(data):
+        resp = model.chat(tokenizer, query, history=[])
+        res = resp[0].replace('，', ',').replace('；', ';')
+        if res[-1] == ';':
+            res = res[:-1]
+        lines = [line.strip() for line in res.split(';')]
+        data = [line.split(',') for line in lines]
+
+        data_e = copy.deepcopy(data)
+        df = pd.read_csv('./data/bodyparts.csv', encoding='utf-8')
+        bodyparts_dict = df.iloc[:, -1].tolist()
+        for de in data_e:
+            flag = de[1]
+            if de[1] in bodyparts_dict:
+                continue
+            else:
+                de[1]=enity_alignment_e(de[1])
+            ws3.append(de)
+
+        for d in data:
+            ws.append(d)  
+
+    wb.save("./data/SignKG-no-e.xlsx")
+    wb3.save("./data/SignKG-e.xlsx")
+
+
+    # 加载Excel工作簿  
+    labelbook = load_workbook(rf'./data/label.xlsx')  
+    Signbook = load_workbook(rf'./data/SignKG-no-e.xlsx')
+    Signebook = load_workbook(rf'./data/SignKG-e.xlsx')
+    # 选择第一个工作表（你也可以通过名字选择工作表）  
+    worksheet_l = labelbook.active  
+    worksheet_n = Signbook.active 
+    worksheet_e = Signebook.active 
+    # 初始化一个空列表，用于存放每一行的列表  
+    label = []
+    Sign_n = []
+    Sign_e = []
+    # 遍历工作表中的每一行（从第二行开始，因为第一行通常是标题行）  
+    for row in worksheet_l.iter_rows(min_row=1, values_only=True):  
+        # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
+        row_as_list = list(row)  
+        label.append(row_as_list)  
+
+    for row in worksheet_n.iter_rows(min_row=1, values_only=True):  
+        # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
+        row_as_list = list(row)  
+        Sign_n.append(row_as_list) 
+
+    for row in worksheet_e.iter_rows(min_row=1, values_only=True):  
+        # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
+        row_as_list = list(row)  
+        Sign_e.append(row_as_list) 
+
+    lbg = sp(label)
+    Sng = sp(Sign_n)
+    Seg = sp(Sign_e)
+
+    right_n=right_e=fn=0
+    for key in Sng:
+        for t in Sng[key]:
+            t = list(filter(None.__ne__, t))
+            if len(t) != 4:
+                fn+=1
+            for sublist in lbg[key]:
+                bodyp=t[1].replace(" ", "")
+                lab = sublist[1].replace(" ", "")
+                if bodyp == lab:
+                    right_n+=1
+                    break
+
+    for key in Seg:
+        for t1 in Seg[key]:
+            for sublist in lbg[key]:
+                bodyp=t1[1].replace(" ", "")
+                lab = sublist[1].replace(" ", "")
+                if bodyp == lab:
+                    right_e+=1
+                    break
+
+    recall = 1-(fn/(len(label)-fn))
+    acc_n = right_n/len(label)
+    acc_e = right_e/len(label)
+    print(f"Entity Recall: {recall:.4f}")
+    print(f"Entity Accuracy (Normal): {acc_n:.4f}")
+    print(f"Entity Accuracy (Enhanced): {acc_e:.4f}")
+
+
+    file_paths = ['./data/label.xlsx', './data/SignKG-e.xlsx']  
+
+    data_dict = {}  
     
-    output_to_excel(out_path,'./data/SignKG-no-e.xlsx')
+    for file_path in file_paths:  
+        data_dict[file_path] = process_excel(file_path)    
+    missing_count = count_missing_elements(data_dict)
+
+    r_recall = 1-(missing_count/(len(data_dict['./data/label.xlsx'])-missing_count))
+    r_acc_e = (len(data_dict['./data/label.xlsx'])-missing_count)/len(data_dict['./data/label.xlsx'])
+    print(f"Relation Recall: {r_recall:.4f}")
+    print(f"Relation Accuracy (Normal): {acc_n:.4f}")
+    print(f"Relation Accuracy (Enhanced): {r_acc_e:.4f}")
 
 
-    df2 = pd.read_csv('./bodyparts.csv', encoding='utf-8')
-    bodyparts_dict2 = df2.iloc[:, -1].tolist()
-
-    reranker = FlagReranker('./thirdparty/bge/bge-reranker-large', use_fp16=True)
-
-    file_path = './data/SignKG-no-e.xlsx'
-    df = pd.read_excel(file_path)
-    bodyparts_data = df.iloc[:, 1].tolist()
-    for index, bodypart in tqdm(enumerate(bodyparts_data)):
-        bodypart=bodypart.replace(" ", "")  
-        if bodypart in bodyparts_dict2:
-            continue
-        else:
-            res = enity_alignment_e(bodypart)
-            df.iloc[index, 1] = res
-    df.to_excel('./data/SignKG-e.xlsx', index=False)
-
-
-# 加载Excel工作簿  
-labelbook = load_workbook(rf'./data/label.xlsx')  
-Signbook = load_workbook(rf'./data/SignKG-no-e.xlsx')
-Signebook = load_workbook(rf'./data/SignKG-e.xlsx')
-# 选择第一个工作表（你也可以通过名字选择工作表）  
-worksheet_l = labelbook.active  
-worksheet_n = Signbook.active 
-worksheet_e = Signebook.active 
-# 初始化一个空列表，用于存放每一行的列表  
-label = []
-Sign_n = []
-Sign_e = []
-# 遍历工作表中的每一行（从第二行开始，因为第一行通常是标题行）  
-for row in worksheet_l.iter_rows(min_row=1, values_only=True):  
-    # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
-    row_as_list = list(row)  
-    label.append(row_as_list)  
-
-for row in worksheet_n.iter_rows(min_row=1, values_only=True):  
-    # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
-    row_as_list = list(row)  
-    Sign_n.append(row_as_list) 
-
-for row in worksheet_e.iter_rows(min_row=1, values_only=True):  
-    # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
-    row_as_list = list(row)  
-    Sign_e.append(row_as_list) 
-
-lbg = sp(label)
-Sng = sp(Sign_n)
-Seg = sp(Sign_e)
-
-right_n=right_e=fn=0
-for key in Sng:
-    for t in Sng[key]:
-        t = list(filter(None.__ne__, t))
-        if len(t) != 4:
-            fn+=1
-        for sublist in lbg[key]:
-            bodyp=t[1].replace(" ", "")
-            lab = sublist[1].replace(" ", "")
-            if bodyp == lab:
-                right_n+=1
-                break
-
-for key in Seg:
-    for t1 in Seg[key]:
-        for sublist in lbg[key]:
-            bodyp=t1[1].replace(" ", "")
-            lab = sublist[1].replace(" ", "")
-            if bodyp == lab:
-                right_e+=1
-                break
-
-recall = 1-(fn/(len(label)-fn))
-acc_n = right_n/len(label)
-acc_e = right_e/len(label)
-print(f"Entity Recall: {recall:.4f}")
-print(f"Entity Accuracy (Normal): {acc_n:.4f}")
-print(f"Entity Accuracy (Enhanced): {acc_e:.4f}")
-
-
-
-
-
-
-
-
-
-# 计算F1分数  
-f1_score_n = calculate_f1(acc_n, recall)  
-f1_score_e = calculate_f1(acc_e, recall)  
-  
-# 输出F1分数  
-print(f"Entity F1 Score (Normal): {f1_score_n:.4f}")
-print(f"Entity F1 Score (Enhanced): {f1_score_e:.4f}")
+    # 计算F1分数  
+    f1_score_n = calculate_f1(acc_n, recall)  
+    f1_score_e = calculate_f1(acc_e, recall)  
+    
+    # 输出F1分数  
+    print(f"Entity F1 Score (Normal): {f1_score_n:.4f}")
+    print(f"Entity F1 Score (Enhanced): {f1_score_e:.4f}")
