@@ -8,10 +8,10 @@ from test import model_act
 
 def data_change(data_):
     if data_ == "上传数据":
-        file_path = select_file() # 选择prompt文件
+        file_path = select_file()
         return pd.read_excel(file_path)
     
-# 选择prompt文件
+    
 def select_file():
     app = QApplication(sys.argv)
     file_path, _ = QFileDialog.getOpenFileName()
@@ -23,7 +23,6 @@ def get_response(prompt):
     response = model.chat(tokenizer, prompt, history=[])
     res = response[0].replace('，', ',').replace('；', ';')
     if res[-1] == ';':
-# 去除末尾的分号
         res = res[:-1]
     lines = [line.strip() for line in res.split(';')]
     data = [line.split(',') for line in lines]
@@ -89,11 +88,10 @@ def function2(face2_input1,face2_input2):
 
 if __name__ == "__main__":
     model,tokenizer = model_act()
-    # ***************************************** face1设置 *****************************************
+
     input1 =gr.Textbox(label="手语词：手语动作描述",lines=1)
     output2 = gr.DataFrame(pd.DataFrame(columns=["手语词","肢体部位","关系动作","时序属性"]),label="手语知识图谱")
 
-    # ***************************************** face2设置 *****************************************
     face2_input1 = gr.Radio(choices=["上传数据"],label="批量数据")
     face2_input2 =gr.DataFrame(pd.DataFrame(columns=["手语词","手语动作描述"]))
     face2_onput2 = gr.DataFrame(pd.DataFrame(columns=["手语词","肢体部位","关系动作","时序属性"]),label="手语知识图谱")
@@ -102,7 +100,6 @@ if __name__ == "__main__":
     iface2 = gr.Interface(function2, [face2_input1,face2_input2],[face2_onput2],submit_btn="图谱生成",allow_flagging="never",clear_btn=gr.Button("清除",visible=False))
 
 
-    # ***************************************** 构建交互界面 *****************************************
     tabbed_interface = gr.TabbedInterface([iface1, iface2], ["手动输入", "批量输入"], title="手语知识图谱自动化构建")
 
     with tabbed_interface as tt:

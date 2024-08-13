@@ -5,9 +5,7 @@ import json
 
 
 def model_act():
-    STEP=3000
-    CHECKPOINT='adgen-chatglm-6b-pt-512-2e-2'
-    ptuning_checkpoint = fr'./checkpoint/{CHECKPOINT}/checkpoint-{STEP}'
+    ptuning_checkpoint = fr'./checkpoint'
     model_path = './thirdparty/glm/chatglm-6b'
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
@@ -19,7 +17,6 @@ def model_act():
         if k.startswith("transformer.prefix_encoder."):
             new_prefix_state_dict[k[len("transformer.prefix_encoder."):]] = v
     model.transformer.prefix_encoder.load_state_dict(new_prefix_state_dict)
-    # model = AutoModel.from_pretrained(ptuning_checkpoint, trust_remote_code=True)
     model = model.quantize(4)
     model = model.half().cuda()
     model.transformer.prefix_encoder.float()
@@ -29,8 +26,8 @@ def model_act():
 
 if __name__ == "__main__":
     
-    file_path = 'data/P-test.json'
-    out_path = 'data/P-test_output.txt'
+    file_path = './data/P-test.json'
+    out_path = './data/P-test_output.txt'
 
     data = []
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -44,5 +41,4 @@ if __name__ == "__main__":
         model,tokenizer = model_act()
         for query in data:
             res = model.chat(tokenizer, query, history=[])
-            # print(res)
             o.write(res[0]+'\n')
