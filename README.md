@@ -6,7 +6,7 @@ $ git clone https://github.com/Lzq19/SLKG.git
 $ cd SLKG
 $ conda install --yes --file requirements.txt
 ```
-## Fine-tunning
+## Fine-tuning
 Follow the glm fine-tuning method. The training file is `P-train.json`, the testing file is `P-test.json`.
 ```bash
 https://github.com/THUDM/ChatGLM-6B/blob/main/ptuning/README.md
