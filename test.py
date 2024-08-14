@@ -7,8 +7,9 @@ from enity_alignment import enity_alignment_e
 import copy
 import pandas as pd
 from openpyxl import load_workbook, Workbook
-from FlagEmbedding import BGEM3FlagModel
-
+from evl_re import acc_n,process_excel,count_missing_elements,RRC
+from evl_entiy import sp
+from F1 import calculate_f1
 
 
 def model_act():
@@ -31,66 +32,8 @@ def model_act():
     return model,tokenizer
 
 
-def sp(label):
-    # 使用字典来根据第一个字符串元素分组  
-    label_groups = {}
-    for sublist in label:
-        key = sublist[0]  # 第一个字符串元素作为键  
-        if key not in label_groups:
-            label_groups[key] = []
-        label_groups[key].append(sublist)  # 将整个子列表添加到对应的组中  
-    return label_groups
-
-def calculate_f1(precision, recall):  
-    if precision == 0 or recall == 0:  
-        return 0  
-    else:  
-        f1 = 2 * (precision * recall) / (precision + recall)  
-        return f1  
-
-def bgem3(list,lists):
-    model = BGEM3FlagModel('./thirdparty/bge/bge-m3', use_fp16=True) 
-
-    embeddings1 = model.encode(list)
-    for i in lists:
-        embeddings2 = model.encode(i)
-        pc = 0
-        for vec1, vec2 in zip(embeddings1['dense_vecs'], embeddings2['dense_vecs']):
-            sim = vec1 @ vec2.T
-            if sim > 0.9:
-                pc+=1
-                continue
-        if pc==4:
-            return 0
-        else:
-            continue
-    return 1
-
-def process_excel(file_path):  
-    workbook = load_workbook(file_path)  
-    sheet = workbook.active  
-    all_rows = []  
-    # 读取所有列
-    for row in sheet.iter_rows(values_only=True):  
-        # 读取所有列并删除空格  
-        row_data = [str(cell).strip() for cell in row]   
-        all_rows.append(row_data)  
-      
-    return all_rows
-
-def count_missing_elements(data_dict):  
-    label_sublists = data_dict['./data/label.xlsx']
-    sign_sublists = data_dict['./data/SignKG-e.xlsx']
-
-    worse = 0
-    for sign_sublist in tqdm(sign_sublists):  
-        worsec = bgem3(sign_sublist,label_sublists)
-        worse += worsec
- 
-    return worse 
-
 if __name__ == "__main__":
-    
+    # predict
     file_path = './data/P-test.json'
     wb2 = Workbook() 
     ws2 = wb2.active
@@ -213,13 +156,21 @@ if __name__ == "__main__":
     
     for file_path in file_paths:  
         data_dict[file_path] = process_excel(file_path)    
-    missing_count = count_missing_elements(data_dict)
 
-    r_recall = 1-(missing_count/(len(data_dict['./data/label.xlsx'])-missing_count))
-    r_acc_e = (len(data_dict['./data/label.xlsx'])-missing_count)/len(data_dict['./data/label.xlsx'])
-    print(f"Relation Recall: {r_recall:.4f}")
-    print(f"Relation Accuracy (Normal): {acc_n:.4f}")
-    print(f"Relation Accuracy (Enhanced): {r_acc_e:.4f}")
+    recall_w = RRC(data_dict)
+    rrecall = 1-(recall_w/(len(data_dict['./data/label.xlsx'])))
+
+    
+    label_sublists = data_dict['label.xlsx']
+    sign_sublists = data_dict['SignKG-e.xlsx']
+    worsen = acc_n(label_sublists,sign_sublists)
+    accn = 1-(worsen/len(data_dict['label.xlsx']))
+
+    worsee = count_missing_elements(data_dict)
+
+    r_acc = 1 - worsee / len(data_dict['./data/label.xlsx'])
+    print(f"Relation Recall: {rrecall:.4f}")
+    print(f"Relation Accuracy: {r_acc:.4f}")
 
 
     # 计算F1分数  

@@ -1,5 +1,7 @@
 import openpyxl  
 from FlagEmbedding import BGEM3FlagModel
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
 
 def bgem3(lista,listb):
@@ -26,6 +28,24 @@ def acc_n(lista,listb):
             worse += 1
     return worse 
             
+def m3e(list,lists):
+    model = SentenceTransformer('m3e-base')
+
+    #Sentences are encoded by calling model.encode()
+    embeddings1 = model.encode(list)
+    for i in lists:
+        embeddings2 = model.encode(i)
+        pc = 0
+        for vec1, vec2 in zip(embeddings1, embeddings2):
+            sim = cosine_similarity([vec1], [vec2])[0][0]
+            if sim > 0.9:
+                pc+=1
+                continue
+        if pc==4:
+            return 0
+        else:
+            continue
+    return 1
 
 def process_excel(file_path):  
     workbook = openpyxl.load_workbook(file_path)  
@@ -44,13 +64,14 @@ def count_missing_elements(data_dict):
     label_sublists = data_dict['./data/label.xlsx']
     sign_sublists = data_dict['./data/SignKG-e.xlsx']
 
-    worse = 0
-    for predict,gt in tqdm(zip(sign_sublists,label_sublists)):
-        worsec = bgem3(predict,gt)
-        worsen = acc_n(predict,gt)
-        worse += worsec
- 
-    return worse 
+    worsee = 0
+    # 遍历'sign'中的每个子列表  
+    for sign_sublist in tqdm(sign_sublists):  
+        # worsec = bgem3(sign_sublist,label_sublists)
+        worsec = m3e(sign_sublist,label_sublists)
+        worsee += worsec
+    # return missing_count   
+    return worsee 
 
 def RRC(dict):
     label = dict['label.xlsx']
@@ -70,10 +91,14 @@ if __name__=='__main__':
     rrecall = 1-(recall_w/(len(data_dict['./data/label.xlsx'])))
 
     
-    missing_count = count_missing_elements(data_dict)
+    label_sublists = data_dict['label.xlsx']
+    sign_sublists = data_dict['SignKG-e.xlsx']
+    worsen = acc_n(label_sublists,sign_sublists)
+    accn = 1-(worsen/len(data_dict['label.xlsx']))
 
-    r_acc_e = (len(data_dict['./data/label.xlsx'])-missing_count)/len(data_dict['./data/label.xlsx'])
+    worsee = count_missing_elements(data_dict)
+
+    r_acc = 1 - worsee / len(data_dict['./data/label.xlsx'])
     print(f"Relation Recall: {rrecall:.4f}")
-    print(f"Relation Accuracy (Normal): {acc_n:.4f}")
-    print(f"Relation Accuracy (Enhanced): {r_acc_e:.4f}")
+    print(f"Relation Accuracy: {r_acc:.4f}")
 
