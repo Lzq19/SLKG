@@ -73,7 +73,7 @@ def count_missing_elements(data_dict):
     # return missing_count   
     return worsee 
 
-def RRC(dict):
+def calculate_recall_number(dict):
     label = dict['label.xlsx']
     predict = dict['SignKG-e.xlsx']
     pc = len(label)-len(predict)

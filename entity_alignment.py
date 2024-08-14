@@ -23,7 +23,7 @@ def enity_alignment_r(bodypart):
                 return top
 
 
-def enity_alignment_e(bodypart):
+def entity_alignment_e(bodypart):
     model = BGEM3FlagModel('./thirdparty/bge/bge-m3', use_fp16=True)
     df = pd.read_csv('./data/bodyparts.csv', encoding='utf-8')
 
@@ -57,6 +57,6 @@ if __name__ == '__main__':
         if bodypart in bodyparts_dict2:
             continue
         else:
-            res = enity_alignment_e(bodypart)
+            res = entity_alignment_e(bodypart)
             df.iloc[index, 1] = res
     df.to_excel('./data/SignKG-e.xlsx', index=False)
