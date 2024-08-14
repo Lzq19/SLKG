@@ -13,6 +13,7 @@ https://github.com/THUDM/ChatGLM-6B/blob/main/ptuning/README.md
 ```
 ## Structure
 Placement of checkpoint according to the following structure.
+<!--checkpoint: https://drive.google.com/file/d/1CxX9tl3HKCL85tpeB8j5AJzYlI3dGr2F/view?usp=drive_link-->
 ```bash
 ├── SLKG/
 │   └── data/
