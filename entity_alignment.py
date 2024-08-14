@@ -4,27 +4,8 @@ import pandas as pd
 from tqdm import tqdm
 
 
-def enity_alignment_r(bodypart):
-    df = pd.read_csv('./data/bodyparts.csv', encoding='utf-8')
-
-    bodyparts_dict = df.iloc[:, -1].tolist()
-    score_list = []
-    for bodypart_ in bodyparts_dict:
-        score = reranker.compute_score([bodypart,bodypart_])
-        score_list.append(score)
-
-    indexs = sorted(range(len(score_list)), key=lambda i: score_list[i], reverse=True)[:2]
-    top2 = [bodyparts_dict[i] for i in indexs]
-    if len(top2[0]) == len(top2[1]):
-        return top2[0]
-    else:
-        for top in top2:
-            if len(bodypart) < len(top):
-                return top
-
-
 def entity_alignment_e(bodypart):
-    model = BGEM3FlagModel('./thirdparty/bge/bge-m3', use_fp16=True)
+    model = BGEM3FlagModel('BAAI/bge-m3', use_fp16=True)
     df = pd.read_csv('./data/bodyparts.csv', encoding='utf-8')
 
     bodyparts_dict = df.iloc[:, -1].tolist()
@@ -43,11 +24,12 @@ def entity_alignment_e(bodypart):
 def process_row(row):
     return [item.upper() if index==1 else item for index, item in enumerate(row)]
 
+
 if __name__ == '__main__':
     df2 = pd.read_csv('./data/bodyparts.csv', encoding='utf-8')
     bodyparts_dict2 = df2.iloc[:, -1].tolist()
 
-    reranker = FlagReranker('./thirdparty/bge/bge-reranker-large', use_fp16=True)
+    reranker = FlagReranker('BAAI/bge-reranker-large', use_fp16=True)
 
     file_path = './data/SignKG-no-e.xlsx'
     df = pd.read_excel(file_path)

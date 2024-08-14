@@ -14,11 +14,9 @@ from F1 import calculate_f1
 
 def model_act():
     ptuning_checkpoint = fr'./checkpoint'
-    model_path = './thirdparty/glm/chatglm-6b'
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-
-    config = AutoConfig.from_pretrained(model_path, trust_remote_code=True, pre_seq_len=512)
-    model = AutoModel.from_pretrained(model_path, config=config, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True)
+    config = AutoConfig.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True, pre_seq_len=512)
+    model = AutoModel.from_pretrained("THUDM/chatglm-6b", config=config, trust_remote_code=True)
     prefix_state_dict = torch.load(os.path.join(ptuning_checkpoint, "pytorch_model.bin"))
     new_prefix_state_dict = {}
     for k, v in prefix_state_dict.items():

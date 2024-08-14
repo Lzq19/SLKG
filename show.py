@@ -3,7 +3,7 @@ import pandas as pd
 import gradio as gr
 from PyQt5.QtWidgets import QFileDialog, QApplication
 import sys
-from test import model_act
+from eval import model_act
 
 
 def data_change(data_):

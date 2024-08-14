@@ -2,33 +2,29 @@ from openpyxl import load_workbook
 
 
 def sp(label):
-    # 使用字典来根据第一个字符串元素分组  
     label_groups = {}
     for sublist in label:
-        key = sublist[0]  # 第一个字符串元素作为键  
+        key = sublist[0]
         if key not in label_groups:
             label_groups[key] = []
-        label_groups[key].append(sublist)  # 将整个子列表添加到对应的组中  
+        label_groups[key].append(sublist)
     return label_groups
 
-if __name__=='__mian__':
-    # 加载Excel工作簿  
+if __name__=='__main__':
     labelbook = load_workbook(rf'./data/label.xlsx')  
     Signebook = load_workbook(rf'./data/SignKG-e.xlsx')
-    # 选择第一个工作表（你也可以通过名字选择工作表）  
+
     worksheet_l = labelbook.active  
     worksheet_e = Signebook.active 
-    # 初始化一个空列表，用于存放每一行的列表  
+
     label = []
     Sign_e = []
-    # 遍历工作表中的每一行（从第二行开始，因为第一行通常是标题行）  
+
     for row in worksheet_l.iter_rows(min_row=1, values_only=True):  
-        # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
         row_as_list = list(row)  
         label.append(row_as_list)  
 
     for row in worksheet_e.iter_rows(min_row=1, values_only=True):  
-        # 将每一行的值转换为一个列表，并添加到rows_as_lists中  
         row_as_list = list(row)  
         Sign_e.append(row_as_list) 
 
